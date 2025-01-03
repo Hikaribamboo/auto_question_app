@@ -15,15 +15,35 @@
       let oauthToken;
 
       // サーバーから環境変数を取得
+      // サーバーから環境変数を取得
       async function fetchEnvVariables() {
-        const response = await fetch('/env');
-        const data = await response.json();
-
-        // 必要な情報を利用
-        console.log("Client ID:", data.clientId);
-        console.log("API Key:", data.apiKey);
+        try {
+          const response = await fetch('/env');
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const data = await response.json();
+          console.log("Fetched environment variables:", data); // デバッグ用
+          return data;
+        } catch (error) {
+          console.error("Failed to fetch environment variables:", error);
+          return null; // エラー時は null を返す
+        }
       }
-      fetchEnvVariables();
+
+      // Google API ロード時に呼び出される関数
+      async function onApiLoad() {
+        const envVariables = await fetchEnvVariables();
+        if (!envVariables) {
+          console.error("Environment variables not fetched.");
+          return;
+        }
+
+        const { clientId, apiKey } = envVariables; // JSONから値を分解
+        gapi.load('auth', () => onAuthApiLoad(clientId));
+        gapi.load('picker', onPickerApiLoad);
+      }
+
 
 
       // Google API ロード時に呼び出される関数

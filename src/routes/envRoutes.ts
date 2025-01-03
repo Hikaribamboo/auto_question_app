@@ -6,7 +6,7 @@ const router = Router();
 router.get("/env", (req, res) => {
   res.json({
     clientId: process.env.CLIENT_ID,
-    apiKey: process.env.API_KEY, // 必要なものだけ渡す
+    apiKey: process.env.API_KEY,
   });
 });
 
