@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Google Drive Picker</title>
+    <meta charset="utf-8" />
+    <script src="https://apis.google.com/js/api.js"></script>
+  </head>
+  <body>
+    <h1>Google Drive Picker Demo</h1>
+    <button id="pick-file" style="display:none;">Pick a File</button>
+    <div id="file-info"></div>
+
+    <script>
+      let pickerApiLoaded = false;
+      let oauthToken;
+
+      // サーバーから環境変数を取得
+      async function fetchEnvVariables() {
+        const response = await fetch('/env');
+        const data = await response.json();
+
+        // 必要な情報を利用
+        console.log("Client ID:", data.clientId);
+        console.log("API Key:", data.apiKey);
+      }
+      fetchEnvVariables();
+
+
+      // Google API ロード時に呼び出される関数
+      async function onApiLoad() {
+        const envVariables = await fetchEnvVariables();
+
+        const { clientId, apiKey } = envVariables;
+
+        if (!clientId || !apiKey) {
+          console.error("Client ID or API Key is missing");
+          return;
+        }
+
+        gapi.load('auth', () => onAuthApiLoad(clientId));
+        gapi.load('picker', onPickerApiLoad);
+      }
+
+
+      // Picker API ロード時に呼び出される関数
+      function onPickerApiLoad() {
+        pickerApiLoaded = true;
+      }
+
+      // 認証を初期化する
+      function onAuthApiLoad(clientId) {
+        gapi.auth.authorize(
+          {
+            client_id: clientId, // サーバーから取得したクライアントID
+            scope: ['https://www.googleapis.com/auth/drive.file'],
+            immediate: false,
+          },
+          handleAuthResult
+        );
+      }
+
+      // 認証結果を処理する
+      function handleAuthResult(authResult) {
+          if (authResult && !authResult.error) {
+              oauthToken = authResult.access_token;
+              document.getElementById('pick-file').style.display = 'block'; // ボタンを表示
+          }
+      }
+
+
+      // Picker を開く
+      async function createPicker() {
+        const { apiKey } = await fetchEnvVariables();
+
+        if (pickerApiLoaded && oauthToken) {
+          const picker = new google.picker.PickerBuilder()
+            .addView(google.picker.ViewId.DOCS)
+            .setOAuthToken(oauthToken)
+            .setDeveloperKey(apiKey) // サーバーから取得したAPIキー
+            .setCallback(pickerCallback)
+            .build();
+          picker.setVisible(true);
+        }
+      }
+
+      // Picker の結果を処理する
+      function pickerCallback(data) {
+        if (data.action === google.picker.Action.PICKED) {
+          const file = data.docs[0];
+          document.getElementById('file-info').innerText = `Selected file: ${file.name} (${file.id})`;
+          console.log(`File ID: ${file.id}, File Name: ${file.name}`);
+        }
+      }
+
+      document.getElementById('pick-file').addEventListener('click', createPicker);
+
+      // API を読み込む
+      gapi.load('client:auth2', onApiLoad);
+    </script>
+  </body>
+</html>

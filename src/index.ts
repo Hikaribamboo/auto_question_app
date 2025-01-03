@@ -1,18 +1,20 @@
-import express from 'express';
-import dotenv from 'dotenv';
-import chatWithFileRouter from './routes/chatWithFile';
+import express from "express";
+import dotenv from "dotenv";
+import path from "path";
+import envRoutes from "./routes/envRoutes";
 
-dotenv.config(); // .envファイルを読み込み
+dotenv.config(); // 環境変数の読み込み
 
 const app = express();
+const PORT = process.env.PORT || 8000;
 
-// JSONリクエストのパース
-app.use(express.json());
+// 静的ファイルの提供 (フロントエンド用)
+app.use(express.static(path.join(__dirname, "../public")));
 
-// ルート設定
-app.use('/', chatWithFileRouter);
+// `/env` エンドポイントを設定
+app.use(envRoutes);
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+// サーバー起動
+app.listen(PORT, () => {
+  console.log(`Server is running at http://localhost:${PORT}`);
 });

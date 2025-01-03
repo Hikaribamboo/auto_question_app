@@ -5,14 +5,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const dotenv_1 = __importDefault(require("dotenv"));
-const chatWithFile_1 = __importDefault(require("./routes/chatWithFile"));
-dotenv_1.default.config(); // .envファイルを読み込み
+const path_1 = __importDefault(require("path"));
+const envRoutes_1 = __importDefault(require("./routes/envRoutes"));
+dotenv_1.default.config(); // 環境変数の読み込み
 const app = (0, express_1.default)();
-// JSONリクエストのパース
-app.use(express_1.default.json());
-// ルート設定
-app.use('/', chatWithFile_1.default);
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-    console.log(`Server is running on http://localhost:${port}`);
+const PORT = process.env.PORT || 8000;
+// 静的ファイルの提供 (フロントエンド用)
+app.use(express_1.default.static(path_1.default.join(__dirname, "../public")));
+// `/env` エンドポイントを設定
+app.use(envRoutes_1.default);
+// サーバー起動
+app.listen(PORT, () => {
+    console.log(`Server is running at http://localhost:${PORT}`);
 });
