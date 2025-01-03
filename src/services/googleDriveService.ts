@@ -1,89 +1,77 @@
-// src/services/googleDriveService.ts
-
 import { google } from 'googleapis';
 import fs from 'fs';
 import path from 'path';
 
-// サービスアカウントのJSONファイルパスを指定
+// 認証用のクレデンシャル情報とスコープ
 const KEY_FILE_PATH = path.join(__dirname, '../../credentials/credentials.json');
-
-// 認証スコープ (読み書き権限)
 const SCOPES = ['https://www.googleapis.com/auth/drive'];
 
-/**
- * Google Drive API で使う認証クライアントを生成
- */
+// Google OAuth2 クライアントを作成する
 function createAuthClient() {
-  // 認証情報のJSONを読み込む
   const auth = new google.auth.GoogleAuth({
     keyFile: KEY_FILE_PATH,
-    scopes: SCOPES
+    scopes: SCOPES,
   });
   return auth;
 }
 
-/**
- * ファイル名からファイルIDを検索して、最初に見つかったファイルの ID を返す
- */
-export async function findFileIdByName(fileName: string): Promise<string | null> {
+// ** 1. Google Drive Pickerでファイルを選択 **
+export function initGooglePicker(clientId: string, developerKey: string): string {
+  return `
+    <script type="text/javascript">
+      function onApiLoad() {
+        gapi.load('picker', { callback: onPickerApiLoad });
+      }
+      function onPickerApiLoad() {
+        const picker = new google.picker.PickerBuilder()
+          .setOAuthToken(gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse().access_token)
+          .setDeveloperKey('${developerKey}')
+          .setCallback(pickerCallback)
+          .build();
+        picker.setVisible(true);
+      }
+      function pickerCallback(data) {
+        if (data[google.picker.Response.ACTION] === google.picker.Action.PICKED) {
+          const file = data[google.picker.Response.DOCUMENTS][0];
+          console.log('Selected file:', file);
+          alert('Selected file: ' + JSON.stringify(file)); // ファイル情報を確認
+        }
+      }
+    </script>
+  `;
+}
+
+// ** 2. Google Driveファイルの内容を更新 **
+export async function updateFileContent(fileId: string, newContent: string): Promise<void> {
   const authClient = createAuthClient();
   const drive = google.drive({ version: 'v3', auth: authClient });
 
-  const res = await drive.files.list({
-    q: `name='${fileName}'`,
-    fields: 'files(id, name)'
+  // 一時的に新しい内容をローカルに保存
+  const tempFilePath = path.join(__dirname, '../../temp/tempfile.txt');
+  fs.writeFileSync(tempFilePath, newContent);
+
+  // Google Drive APIを使用してファイルを更新
+  await drive.files.update({
+    fileId,
+    media: {
+      body: fs.createReadStream(tempFilePath),
+    },
   });
-  const files = res.data.files;
-  if (files && files.length > 0 && files[0].id) {
-    return files[0].id;
-  }
-  return null;
+
+  // 一時ファイルを削除
+  fs.unlinkSync(tempFilePath);
 }
 
-/**
- * 指定した fileId のファイルをダウンロードしてローカルに保存
- */
-export async function downloadFile(fileId: string, destPath: string): Promise<void> {
-  const authClient = createAuthClient();
-  const drive = google.drive({ version: 'v3', auth: authClient });
+// ** 3. Google Driveのファイル一覧を取得 **
+export async function listFiles(authToken: string): Promise<any[]> {
+  const oauth2Client = new google.auth.OAuth2();
+  oauth2Client.setCredentials({ access_token: authToken });
 
-  const response = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'arraybuffer' });
-  fs.writeFileSync(destPath, Buffer.from(response.data as ArrayBuffer));
-}
+  const drive = google.drive({ version: 'v3', auth: oauth2Client });
+  const response = await drive.files.list({
+    pageSize: 10, // 取得するファイル数
+    fields: 'files(id, name)', // 必要に応じて取得フィールドを変更
+  });
 
-/**
- * ローカルファイルを Google Drive にアップロード
- * - 存在するファイルを更新したい場合は `existingFileId` を渡す
- */
-export async function uploadFile(
-  fileName: string,
-  localPath: string,
-  existingFileId?: string
-): Promise<string> {
-  const authClient = createAuthClient();
-  const drive = google.drive({ version: 'v3', auth: authClient });
-
-  if (existingFileId) {
-    // 既存ファイルを更新
-    await drive.files.update({
-      fileId: existingFileId,
-      media: {
-        body: fs.createReadStream(localPath),
-      },
-    });
-    return existingFileId;
-  } else {
-    // 新規にアップロード
-    const fileMetadata = {
-      name: fileName
-    };
-    const media = {
-      body: fs.createReadStream(localPath),
-    };
-    const res = await drive.files.create({
-      requestBody: fileMetadata,
-      media: media
-    });
-    return res.data.id || '';
-  }
+  return response.data.files || [];
 }

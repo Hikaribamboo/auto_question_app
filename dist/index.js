@@ -4,13 +4,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
-const question_1 = __importDefault(require("./routes/question"));
+const dotenv_1 = __importDefault(require("dotenv"));
+const chatWithFile_1 = __importDefault(require("./routes/chatWithFile"));
+dotenv_1.default.config(); // .envファイルを読み込み
 const app = (0, express_1.default)();
-const port = 3000;
-// JSONボディの解析用ミドルウェア
+// JSONリクエストのパース
 app.use(express_1.default.json());
-// ルーティング
-app.use('/question', question_1.default);
+// ルート設定
+app.use('/', chatWithFile_1.default);
+const port = process.env.PORT || 3000;
 app.listen(port, () => {
     console.log(`Server is running on http://localhost:${port}`);
 });
