@@ -8,6 +8,7 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const path_1 = __importDefault(require("path"));
 const googleapis_1 = require("googleapis");
 const envRoutes_1 = __importDefault(require("./routes/envRoutes"));
+const chatWithFile_1 = __importDefault(require("./routes/chatWithFile")); // ChatGPT関連の処理を別ファイルで管理
 // 環境変数の読み込み
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -56,6 +57,8 @@ app.get('/oauth2callback', async (req, res) => {
         res.status(500).send('認証に失敗しました。もう一度お試しください。');
     }
 });
+// ChatGPT と連携するエンドポイント
+app.use(chatWithFile_1.default); // ChatGPTとファイル連携用のエンドポイント
 // サーバー起動
 app.listen(PORT, () => {
     console.log(`Server is running at http://localhost:${PORT}`);

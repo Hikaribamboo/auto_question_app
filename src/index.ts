@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { google } from 'googleapis';
 import envRoutes from './routes/envRoutes';
+import chatWithFileRoutes from "./routes/chatWithFile"; // ChatGPT関連の処理を別ファイルで管理
 
 // 環境変数の読み込み
 dotenv.config();
@@ -61,6 +62,11 @@ app.get('/oauth2callback', async (req, res) => {
     res.status(500).send('認証に失敗しました。もう一度お試しください。');
   }
 });
+
+
+
+// ChatGPT と連携するエンドポイント
+app.use(chatWithFileRoutes); // ChatGPTとファイル連携用のエンドポイント
 
 // サーバー起動
 app.listen(PORT, () => {
