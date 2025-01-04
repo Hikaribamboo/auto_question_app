@@ -10,6 +10,10 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const chatWithFile = require('./routes/chatWithFile');
+app.use(chatWithFile);
+
+
 // 静的ファイルの提供 (フロントエンド用)
 app.use(express.static(path.join(__dirname, '../public')));
 

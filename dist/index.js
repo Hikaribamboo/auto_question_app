@@ -12,6 +12,8 @@ const envRoutes_1 = __importDefault(require("./routes/envRoutes"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3000;
+const chatWithFile = require('./routes/chatWithFile');
+app.use(chatWithFile);
 // 静的ファイルの提供 (フロントエンド用)
 app.use(express_1.default.static(path_1.default.join(__dirname, '../public')));
 // `/env` エンドポイントを設定

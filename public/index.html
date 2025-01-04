@@ -10,10 +10,41 @@
   </head>
   <body>
     <h1>Google Drive Picker Demo</h1>
+      <!-- 科目選択プルダウン -->
+    <label for="subject-select">科目を選択:</label>
+    <select id="subject-select">
+      <option value="" disabled selected>-- 科目を選択 --</option>
+      <option value="国語">国語</option>
+      <option value="数学">数学</option>
+      <option value="英語">英語</option>
+    </select>
+
+    <!-- 出題形式プルダウン -->
+    <label for="format-select" style="display:none;" id="format-label">出題形式を選択:</label>
+    <select id="format-select" style="display:none;">
+      <!-- 動的に内容が追加される -->
+    </select>
+    
+    <!-- 作問数選択 -->
+    <label for="question-count" id="count-label" style="display:none;">作問数を選択:</label>
+    <select id="question-count" style="display:none;">
+      <option value="" disabled selected>-- 作問数を選択 --</option>
+      <option value="1">1</option>
+      <option value="10">10</option>
+      <option value="50">50</option>
+      <option value="100">100</option>
+      <option value="200">200</option>
+    </select>
+
+    <!-- 作問開始ボタン -->
+    <button id="start-creation" style="display:none;">作問開始</button>
+
+    <br><br>
     <button id="pick-file" style="display:none; background-color: red;">Pick a File</button>
-
-    <div id="file-info"></div>
-
+    <div id="file-list">
+      <h2>Selected Files:</h2>
+      <ul id="file-display"></ul>
+    </div>
     <!-- 外部JavaScriptファイル -->
     <script src="script.js"></script>
   </body>
