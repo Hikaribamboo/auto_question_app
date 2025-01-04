@@ -11,96 +11,10 @@
   <body>
     <h1>Google Drive Picker Demo</h1>
     <button id="pick-file" style="display:none; background-color: red;">Pick a File</button>
+
     <div id="file-info"></div>
 
-    <script>
-      let tokenClient;
-      let oauthToken;
-
-      // GIS クライアントの読み込みが完了するまで待機
-      function initializeGisClient(clientId) {
-        if (typeof google === "undefined") {
-          console.error("GIS Client library is not loaded.");
-          return;
-        }
-
-        console.log("Initializing GIS client...");
-        tokenClient = google.accounts.oauth2.initTokenClient({
-          client_id: clientId,
-          scope: 'https://www.googleapis.com/auth/drive.file',
-          callback: (response) => {
-            if (response.access_token) {
-              oauthToken = response.access_token;
-              console.log("OAuth Token obtained:", oauthToken);
-              document.getElementById('pick-file').style.display = 'block';
-            } else {
-              console.error("Failed to obtain access token.");
-            }
-          },
-        });
-      }
-
-      // Google Picker の作成
-      function createPicker() {
-        if (!oauthToken) {
-          console.error("OAuth Token is not available.");
-          return;
-        }
-
-        gapi.load("picker", () => {
-          const picker = new google.picker.PickerBuilder()
-            .addView(google.picker.ViewId.DOCS)
-            .setOAuthToken(oauthToken)
-            .setDeveloperKey("YOUR_API_KEY") // 必要に応じて環境変数を取得
-            .setCallback(pickerCallback)
-            .build();
-          picker.setVisible(true);
-        });
-      }
-
-      // Picker のコールバック
-      function pickerCallback(data) {
-        if (data.action === google.picker.Action.PICKED) {
-          const file = data.docs[0];
-          document.getElementById("file-info").innerText = `Selected file: ${file.name} (${file.id})`;
-          console.log(`File ID: ${file.id}, File Name: ${file.name}`);
-        }
-      }
-
-      // 初期化処理
-      async function initializeApp() {
-        try {
-          const response = await fetch("/env");
-          if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-          }
-
-          const { clientId } = await response.json();
-          if (!clientId) {
-            throw new Error("Client ID is missing.");
-          }
-
-          // GIS クライアントの初期化
-          console.log("Environment variables loaded. Initializing GIS client...");
-          initializeGisClient(clientId);
-
-          // ボタンのクリックで Picker を表示
-          const pickFileButton = document.getElementById("pick-file");
-          pickFileButton.addEventListener("click", () => {
-            console.log("Pick File button clicked.");
-            tokenClient.requestAccessToken();
-          });
-        } catch (error) {
-          console.error("Failed to initialize application:", error);
-        }
-      }
-
-      // GIS クライアントのロードを保証
-      window.onload = initializeApp;
-    </script>
+    <!-- 外部JavaScriptファイル -->
+    <script src="script.js"></script>
   </body>
 </html>
-
-
-
-
