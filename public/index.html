@@ -3,103 +3,104 @@
   <head>
     <title>Google Drive Picker</title>
     <meta charset="utf-8" />
+    <!-- GIS Client ライブラリの読み込み -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- Google API ライブラリの読み込み -->
     <script src="https://apis.google.com/js/api.js"></script>
   </head>
   <body>
     <h1>Google Drive Picker Demo</h1>
-    <button id="pick-file" style="display:none;">Pick a File</button>
+    <button id="pick-file" style="display:none; background-color: red;">Pick a File</button>
     <div id="file-info"></div>
 
     <script>
-      let pickerApiLoaded = false;
+      let tokenClient;
       let oauthToken;
 
-      async function fetchEnvVariables() {
-        try {
-          const response = await fetch('/env');
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          const data = await response.json();
-          return data;
-        } catch (error) {
-          console.error("Failed to fetch environment variables:", error);
-          return null;
-        }
-      }
-
-      async function onApiLoad() {
-        const envVariables = await fetchEnvVariables();
-        if (!envVariables) {
-          console.error("Environment variables not fetched.");
+      // GIS クライアントの読み込みが完了するまで待機
+      function initializeGisClient(clientId) {
+        if (typeof google === "undefined") {
+          console.error("GIS Client library is not loaded.");
           return;
         }
 
-        const { clientId, apiKey } = envVariables;
-
-        if (!clientId || !apiKey) {
-          console.error("Client ID or API Key is missing");
-          return;
-        }
-
-        gapi.load('auth', () => onAuthApiLoad(clientId));
-        gapi.load('picker', onPickerApiLoad);
-      }
-
-      function onPickerApiLoad() {
-        pickerApiLoaded = true;
-      }
-
-      function onAuthApiLoad(clientId) {
-        gapi.auth.authorize(
-          {
-            client_id: clientId,
-            scope: ['https://www.googleapis.com/auth/drive.file'],
-            immediate: false,
+        console.log("Initializing GIS client...");
+        tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'https://www.googleapis.com/auth/drive.file',
+          callback: (response) => {
+            if (response.access_token) {
+              oauthToken = response.access_token;
+              console.log("OAuth Token obtained:", oauthToken);
+              document.getElementById('pick-file').style.display = 'block';
+            } else {
+              console.error("Failed to obtain access token.");
+            }
           },
-          handleAuthResult
-        );
+        });
       }
 
-      function handleAuthResult(authResult) {
-        if (authResult && !authResult.error) {
-          oauthToken = authResult.access_token;
-          document.getElementById('pick-file').style.display = 'block';
-        }
-      }
-
-      async function createPicker() {
-        const { apiKey } = await fetchEnvVariables();
-
-        if (!pickerApiLoaded) {
-          console.error("Picker API is not loaded yet.");
+      // Google Picker の作成
+      function createPicker() {
+        if (!oauthToken) {
+          console.error("OAuth Token is not available.");
           return;
         }
 
-        if (oauthToken) {
+        gapi.load("picker", () => {
           const picker = new google.picker.PickerBuilder()
             .addView(google.picker.ViewId.DOCS)
             .setOAuthToken(oauthToken)
-            .setDeveloperKey(apiKey)
+            .setDeveloperKey("YOUR_API_KEY") // 必要に応じて環境変数を取得
             .setCallback(pickerCallback)
             .build();
           picker.setVisible(true);
-        } else {
-          console.error("OAuth Token is not available.");
-        }
+        });
       }
 
+      // Picker のコールバック
       function pickerCallback(data) {
         if (data.action === google.picker.Action.PICKED) {
           const file = data.docs[0];
-          document.getElementById('file-info').innerText = `Selected file: ${file.name} (${file.id})`;
+          document.getElementById("file-info").innerText = `Selected file: ${file.name} (${file.id})`;
           console.log(`File ID: ${file.id}, File Name: ${file.name}`);
         }
       }
 
-      document.getElementById('pick-file').addEventListener('click', createPicker);
+      // 初期化処理
+      async function initializeApp() {
+        try {
+          const response = await fetch("/env");
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
 
-      gapi.load('client:auth2', onApiLoad);
+          const { clientId } = await response.json();
+          if (!clientId) {
+            throw new Error("Client ID is missing.");
+          }
+
+          // GIS クライアントの初期化
+          console.log("Environment variables loaded. Initializing GIS client...");
+          initializeGisClient(clientId);
+
+          // ボタンのクリックで Picker を表示
+          const pickFileButton = document.getElementById("pick-file");
+          pickFileButton.addEventListener("click", () => {
+            console.log("Pick File button clicked.");
+            tokenClient.requestAccessToken();
+          });
+        } catch (error) {
+          console.error("Failed to initialize application:", error);
+        }
+      }
+
+      // GIS クライアントのロードを保証
+      window.onload = initializeApp;
     </script>
   </body>
 </html>
+
+
+
+

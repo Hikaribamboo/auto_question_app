@@ -17,13 +17,15 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "https://apis.google.com", "'unsafe-inline'"],
+        scriptSrc: ["'self'", "https://apis.google.com", "'nonce-<nonce-value>'"],
         connectSrc: ["'self'", "https://accounts.google.com"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
+        frameSrc: ["https://accounts.google.com"],
       },
     },
   })
 );
+
+
 
 // 静的ファイルの提供 (フロントエンド用)
 app.use(express.static(path.join(__dirname, '../public')));
@@ -56,9 +58,12 @@ app.get('/oauth2callback', async (req, res) => {
     res.send('認証成功！このウィンドウを閉じてください。');
   } catch (error) {
     console.error('エラーが発生しました:', error);
-    res.status(500).send('認証に失敗しました');
+    res.status(500).send(
+      '認証に失敗しました。問題が解決しない場合は再試行してください。'
+    );
   }
 });
+
 
 // サーバー起動
 app.listen(PORT, () => {
