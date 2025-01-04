@@ -3,16 +3,13 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { google } from 'googleapis';
 import envRoutes from './routes/envRoutes';
-import chatWithFileRoutes from "./routes/chatWithFile"; // ChatGPT関連の処理を別ファイルで管理
+import chatWithFile from "./routes/chatWithFile"; // ChatGPT関連の処理を別ファイルで管理
 
 // 環境変数の読み込み
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-const chatWithFile = require('./routes/chatWithFile');
-app.use(chatWithFile);
 
 
 // 静的ファイルの提供 (フロントエンド用)
@@ -66,7 +63,7 @@ app.get('/oauth2callback', async (req, res) => {
 
 
 // ChatGPT と連携するエンドポイント
-app.use(chatWithFileRoutes); // ChatGPTとファイル連携用のエンドポイント
+app.use(chatWithFile); // ChatGPTとファイル連携用のエンドポイント
 
 // サーバー起動
 app.listen(PORT, () => {
