@@ -220,11 +220,9 @@ async function fetchAndSendFiles(subject, format, numQuestions) {
       });
   
       const result = await response.json();
-      console.log("This is result",result)
       if (result.success) {
-        console.log("作問結果:", result.result);
-        alert("作問が完了しました！");
-        displayOutput(result)
+        console.log("作問結果:", result.tableData);
+        displayTableOutput(result.tableData); // テーブル形式で表示
       } else {
         throw new Error(result.message);
       }
@@ -305,29 +303,27 @@ async function fetchFileAsBlob(fileId) {
 // GIS クライアントのロードを保証
 window.onload = initializeApp;
 
-function displayOutput(result) {
-  const outputDisplay = document.getElementById("output-display");
-  outputDisplay.innerHTML = ""; // 既存の内容をクリア
+// テーブル形式でHTMLに表示
+function displayTableOutput(csvData) {
+  const outputSection = document.getElementById("output-display");
+  outputSection.innerHTML = ""; // 既存の内容をクリア
 
-  if (typeof result === "object" && result !== null) {
-    // 結果がオブジェクトの場合、キーごとに内容を表示
-    if (result.success && result.results) {
-      result.results.forEach((question, index) => {
-        const questionElement = document.createElement("div");
-        questionElement.innerHTML = `<strong>Question ${index + 1}:</strong><br>${question}`;
-        outputDisplay.appendChild(questionElement);
-        outputDisplay.appendChild(document.createElement("hr")); // 区切り線を追加
-      });
-    } else {
-      outputDisplay.textContent = JSON.stringify(result, null, 2); // オブジェクト全体を表示
-    }
-  } else {
-    // 結果がテキストの場合
-    const paragraph = document.createElement("p");
-    paragraph.textContent = result;
-    outputDisplay.appendChild(paragraph);
-  }
+  const rows = csvData.split("\n").map((row) => row.split(","));
+  const table = document.createElement("table");
+  table.style.border = "1px solid #ccc";
+  table.style.borderCollapse = "collapse";
+
+  rows.forEach((row, index) => {
+    const tr = document.createElement("tr");
+    row.forEach((cell) => {
+      const td = document.createElement(index === 0 ? "th" : "td");
+      td.textContent = cell.trim();
+      td.style.border = "1px solid #ccc";
+      td.style.padding = "8px";
+      tr.appendChild(td);
+    });
+    table.appendChild(tr);
+  });
+
+  outputSection.appendChild(table);
 }
-
-
-
