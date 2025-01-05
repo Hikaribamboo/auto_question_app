@@ -17,7 +17,7 @@ const router = Router();
 
 router.post(
   "/chat-with-files",
-  upload.single("file"), // Blobは単一ファイルの場合が多いので、singleに変更
+  upload.single("file"),
   async (req: CustomRequest, res: Response) => {
     try {
       console.log("Request received at /chat-with-files");
@@ -40,60 +40,28 @@ router.post(
         return;
       }
 
-      const fileMimeType = req.file.mimetype;
-      console.log(`Uploaded file MIME type: ${fileMimeType}`);
+      const fileContent = await fs.readFile(req.file.path); // ファイル内容を取得
 
-      let result: string;
+      // 命令文を生成
+      const command = generateCommand(subject, format, numQuestions, fileContent.toString());
 
-      if (fileMimeType === "image/png") {
-        // PNGファイルの場合
-        console.log(`File ${req.file.originalname} is an image. Processing as PNG...`);
+      console.log("Generated command:", command);
 
-        // OCRで画像からテキストを抽出
-        const extractedText = await processImage(req.file.path);
+      // ChatGPT API 呼び出し
+      const chatResponse = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [
+          { role: "system", content: "You are a helpful assistant." },
+          { role: "user", content: command },
+          { role: "user", content: fileContent.toString() },
+        ],
+      });
 
-        console.log(`Extracted text from ${req.file.originalname}:`, extractedText);
+      const result = chatResponse.choices[0]?.message?.content || "No response";
 
-        // テキスト化したデータを元にプロンプトを生成
-        const prompt = generateCommand(subject, format, numQuestions, extractedText);
+      console.log(`ChatGPT Response for ${req.file.originalname}:`, result);
 
-        // APIキーが必要な箇所
-        console.log("About to call OpenAI API with prompt:", prompt);
-        console.log("Using API Key:", process.env.OPENAI_API_KEY);
-
-        const response = await openai.chat.completions.create({
-          model: "gpt-3.5-turbo",
-          messages: [
-            { role: "system", content: "You are a helpful assistant." },
-            { role: "user", content: prompt },
-          ],
-        });
-
-        result = response.choices[0]?.message?.content || "No response";
-        console.log(`Received answer for ${req.file.originalname}:`, result);
-      } else {
-        // その他のファイル（例: テキストやPDF）
-        console.log(`File ${req.file.originalname} is not an image. Processing as text...`);
-        const fileContent = await fs.readFile(req.file.path, "utf-8");
-        const prompt = generateCommand(subject, format, numQuestions, fileContent);
-
-        // APIキーが必要な箇所
-        console.log("About to call OpenAI API with prompt:", prompt);
-        console.log("Using API Key:", process.env.OPENAI_API_KEY);
-
-        const response = await openai.chat.completions.create({
-          model: "gpt-3.5-turbo",
-          messages: [
-            { role: "system", content: "You are a helpful assistant." },
-            { role: "user", content: prompt },
-          ],
-        });
-
-        result = response.choices[0]?.message?.content || "No response";
-        console.log(`Received answer for ${req.file.originalname}:`, result);
-      }
-
-      // 一時ファイルを削除
+      // 一時ファイル削除
       await fs.unlink(req.file.path);
       console.log(`Temporary file ${req.file.originalname} deleted.`);
 
@@ -104,16 +72,7 @@ router.post(
     }
   }
 );
-/**
- * 画像処理（例: OCRでテキスト化）
- * @param filePath
- * @returns 抽出したテキスト
- */
-async function processImage(filePath: string): Promise<string> {
-  const extractedText = "Extracted text from image (dummy text)";
-  console.log(`Processing image at ${filePath}. Extracted text:`, extractedText);
-  return extractedText;
-}
+
 
 /**
  * 命令文を生成する関数
