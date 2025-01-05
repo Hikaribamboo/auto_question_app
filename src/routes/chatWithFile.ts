@@ -1,9 +1,10 @@
 import { Router, Response } from "express";
 import multer from "multer";
 import fs from "fs/promises";
+import mammoth from "mammoth";
 import OpenAI from "openai";
 import { CustomRequest } from "./types";
-import mammoth from "mammoth"; // .docx の解析用ライブラリ
+import pdfParse from "pdf-parse"; // PDFをテキストに変換するために利用
 
 // 環境変数の読み込み
 import dotenv from "dotenv";
@@ -18,63 +19,57 @@ const router = Router();
 
 router.post(
   "/chat-with-files",
-  upload.single("file"), // 1つのファイルをアップロード
+  upload.single("file"),
   async (req: CustomRequest, res: Response) => {
     try {
-      console.log("リクエストを受信しました: /chat-with-files");
+      console.log("Request received at /chat-with-files");
 
-      // アップロードされたファイルがあるか確認
       if (!req.file) {
-        console.warn("ファイルがアップロードされていません");
-        res.status(400).json({ success: false, message: "ファイルがアップロードされていません" });
+        console.warn("No file uploaded");
+        res.status(400).json({ success: false, message: "No file uploaded" });
         return;
       }
 
-      // リクエストのパラメータを確認
       const { subject, format, numQuestions } = req.body;
-      console.log("リクエストボディ:", { subject, format, numQuestions });
+      console.log("Request body:", { subject, format, numQuestions });
 
       if (!subject || !format || !numQuestions) {
-        console.warn("必要なフィールドが不足しています: subject, format, numQuestions");
+        console.warn("Missing required fields: subject, format, or numQuestions");
         res.status(400).json({
           success: false,
-          message: "必要なフィールドが不足しています: subject, format, numQuestions",
+          message: "Missing required fields: subject, format, or numQuestions",
         });
         return;
       }
 
-      // アップロードされたファイルのMIMEタイプを取得
       const fileMimeType = req.file.mimetype;
-      console.log(`アップロードされたファイルのMIMEタイプ: ${fileMimeType}`);
+      console.log(`Uploaded file MIME type: ${fileMimeType}`);
 
       let fileContent: string;
-      let result: string;
 
-      if (fileMimeType === "text/plain") {
-        // テキストファイルの場合
-        console.log(`テキストファイルを処理中: ${req.file.originalname}`);
-        fileContent = await fs.readFile(req.file.path, "utf-8");
-
-      } else if (fileMimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
-        // .docx ファイルの場合
-        console.log(`.docx ファイルを処理中: ${req.file.originalname}`);
-        const docxBuffer = await fs.readFile(req.file.path);
-        const docxText = await mammoth.extractRawText({ buffer: docxBuffer });
-        fileContent = docxText.value;
+      if (fileMimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+        // DOCXファイルをテキストに変換
+        const fileBuffer = await fs.readFile(req.file.path);
+        const { value } = await mammoth.extractRawText({ buffer: fileBuffer });
+        fileContent = value.trim();
+      } else if (fileMimeType === "application/pdf") {
+        // PDFファイルをテキストに変換
+        const fileBuffer = await fs.readFile(req.file.path);
+        const pdfData = await pdfParse(fileBuffer);
+        fileContent = pdfData.text.trim();
       } else {
-        // サポートされていないファイルタイプの場合
-        console.error(`サポートされていないファイルタイプ: ${fileMimeType}`);
-        res.status(400).json({ success: false, message: "サポートされていないファイルタイプです" });
+        console.error("Unsupported file type:", fileMimeType);
+        res.status(400).json({ success: false, message: "Unsupported file type" });
         return;
       }
 
-      console.log(`ファイル内容:\n${fileContent.slice(0, 100)}...`); // 内容の一部をログに出力
+      console.log(`Extracted text from file: ${fileContent.substring(0, 100)}...`); // 最初の100文字を表示
 
       // 命令文を生成
       const command = generateCommand(subject, format, numQuestions, fileContent);
-      console.log("生成された命令文:", command);
+      console.log("Generated command:", command);
 
-      // ChatGPT API にリクエストを送信
+      // ChatGPT API 呼び出し
       const chatResponse = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages: [
@@ -83,17 +78,17 @@ router.post(
         ],
       });
 
-      result = chatResponse.choices[0]?.message?.content || "No response";
-      console.log(`ChatGPTの応答: ${result}`);
+      const result = chatResponse.choices[0]?.message?.content || "No response";
+      console.log("ChatGPT response:", result);
 
       // 一時ファイルを削除
       await fs.unlink(req.file.path);
-      console.log(`一時ファイル ${req.file.originalname} を削除しました。`);
+      console.log(`Temporary file ${req.file.originalname} deleted.`);
 
       res.status(200).json({ success: true, result });
     } catch (err) {
-      console.error("エラー発生: /chat-with-files:", err);
-      res.status(500).json({ success: false, message: "内部サーバーエラーが発生しました" });
+      console.error("Error in /chat-with-files:", err);
+      res.status(500).json({ success: false, message: "Internal Server Error" });
     }
   }
 );

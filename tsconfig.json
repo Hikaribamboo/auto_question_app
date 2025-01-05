@@ -1,15 +1,14 @@
 {
   "compilerOptions": {
-    "target": "ES2020",            // ES2020 以上
-    "module": "commonjs",          // Node.js 用
-    "outDir": "./dist",            // 出力フォルダ
-    "rootDir": "./src",            // ソースフォルダ
-    "strict": true,                // 厳格モード
-    "esModuleInterop": true,       // ESモジュール互換
-    "moduleResolution": "node"    // Nodeモジュール解決
-    
+    "target": "ES2020",
+    "module": "commonjs",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "typeRoots": ["./node_modules/@types", "./types"]
   },
-  "include": ["src/**/*"],             // 対象ファイル
-  "exclude": ["node_modules"]     // 除外ファイル
-  
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
 }
