@@ -5,6 +5,7 @@ import mammoth from "mammoth";
 import OpenAI from "openai";
 import { CustomRequest } from "./types";
 import pdfParse from "pdf-parse"; // PDFをテキストに変換するために利用
+import Tesseract from "tesseract.js"; // OCRライブラリのインポート
 
 // 環境変数の読み込み
 import dotenv from "dotenv";
@@ -47,7 +48,21 @@ router.post(
 
       let fileContent: string;
 
-      if (fileMimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+      if (fileMimeType === "image/png") {
+        console.log(`File ${req.file.originalname} is a PNG image. Performing OCR...`);
+      
+        try {
+          // Tesseract.jsを使って画像からテキストを抽出
+          const { data: { text } } = await Tesseract.recognize(req.file.path, "eng");
+      
+          console.log(`Extracted text from ${req.file.originalname}:`, text);
+          fileContent = text.trim();
+        } catch (ocrError) {
+          console.error("Error performing OCR:", ocrError);
+          res.status(500).json({ success: false, message: "Error processing image file" });
+          return;
+        }
+      } else if (fileMimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
         // DOCXファイルをテキストに変換
         const fileBuffer = await fs.readFile(req.file.path);
         const { value } = await mammoth.extractRawText({ buffer: fileBuffer });
@@ -79,15 +94,11 @@ router.post(
       });
 
       const result = chatResponse.choices[0]?.message?.content || "No response";
-      console.log("ChatGPT response:", result);
-
       // 一時ファイルを削除
       await fs.unlink(req.file.path);
-      console.log(`Temporary file ${req.file.originalname} deleted.`);
 
       res.status(200).json({ success: true, result });
     } catch (err) {
-      console.error("Error in /chat-with-files:", err);
       res.status(500).json({ success: false, message: "Internal Server Error" });
     }
   }
