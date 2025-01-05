@@ -220,9 +220,11 @@ async function fetchAndSendFiles(subject, format, numQuestions) {
       });
   
       const result = await response.json();
+      console.log("This is result",result)
       if (result.success) {
-        console.log("作問結果:", result.results);
+        console.log("作問結果:", result.result);
         alert("作問が完了しました！");
+        displayOutput(result)
       } else {
         throw new Error(result.message);
       }
@@ -300,7 +302,32 @@ async function fetchFileAsBlob(fileId) {
   }
 }
 
-
-
 // GIS クライアントのロードを保証
 window.onload = initializeApp;
+
+function displayOutput(result) {
+  const outputDisplay = document.getElementById("output-display");
+  outputDisplay.innerHTML = ""; // 既存の内容をクリア
+
+  if (typeof result === "object" && result !== null) {
+    // 結果がオブジェクトの場合、キーごとに内容を表示
+    if (result.success && result.results) {
+      result.results.forEach((question, index) => {
+        const questionElement = document.createElement("div");
+        questionElement.innerHTML = `<strong>Question ${index + 1}:</strong><br>${question}`;
+        outputDisplay.appendChild(questionElement);
+        outputDisplay.appendChild(document.createElement("hr")); // 区切り線を追加
+      });
+    } else {
+      outputDisplay.textContent = JSON.stringify(result, null, 2); // オブジェクト全体を表示
+    }
+  } else {
+    // 結果がテキストの場合
+    const paragraph = document.createElement("p");
+    paragraph.textContent = result;
+    outputDisplay.appendChild(paragraph);
+  }
+}
+
+
+
