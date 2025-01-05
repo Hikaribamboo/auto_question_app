@@ -4,6 +4,10 @@ import fs from "fs/promises";
 import OpenAI from "openai";
 import { CustomRequest } from "./types";
 
+// 環境変数の読み込み
+import dotenv from "dotenv";
+dotenv.config();
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY ?? "",
 });
@@ -53,6 +57,10 @@ router.post(
         // テキスト化したデータを元にプロンプトを生成
         const prompt = generateCommand(subject, format, numQuestions, extractedText);
 
+        // APIキーが必要な箇所
+        console.log("About to call OpenAI API with prompt:", prompt);
+        console.log("Using API Key:", process.env.OPENAI_API_KEY);
+
         const response = await openai.chat.completions.create({
           model: "gpt-3.5-turbo",
           messages: [
@@ -68,6 +76,10 @@ router.post(
         console.log(`File ${req.file.originalname} is not an image. Processing as text...`);
         const fileContent = await fs.readFile(req.file.path, "utf-8");
         const prompt = generateCommand(subject, format, numQuestions, fileContent);
+
+        // APIキーが必要な箇所
+        console.log("About to call OpenAI API with prompt:", prompt);
+        console.log("Using API Key:", process.env.OPENAI_API_KEY);
 
         const response = await openai.chat.completions.create({
           model: "gpt-3.5-turbo",
@@ -92,7 +104,6 @@ router.post(
     }
   }
 );
-
 /**
  * 画像処理（例: OCRでテキスト化）
  * @param filePath
