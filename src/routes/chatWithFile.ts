@@ -2,33 +2,25 @@ import { Router, Response } from "express";
 import multer from "multer";
 import fs from "fs/promises";
 import OpenAI from "openai";
-import { CustomRequest } from "./types"; // あなたが定義したCustomRequestをインポート
-
-// 環境変数の読み込み
-import dotenv from "dotenv";
-dotenv.config();
-
-console.log("API Key used for OpenAI:", process.env.OPENAI_API_KEY);
+import { CustomRequest } from "./types";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY ?? "",
 });
-
-console.log("OpenAI instance initialized:", openai);
 
 const upload = multer({ dest: "temp/" });
 const router = Router();
 
 router.post(
   "/chat-with-files",
-  upload.array("files"),
+  upload.single("file"), // Blobは単一ファイルの場合が多いので、singleに変更
   async (req: CustomRequest, res: Response) => {
     try {
       console.log("Request received at /chat-with-files");
 
-      if (!req.files || (Array.isArray(req.files) && req.files.length === 0)) {
-        console.warn("No files uploaded");
-        res.status(400).json({ success: false, message: "No files uploaded" });
+      if (!req.file) {
+        console.warn("No file uploaded");
+        res.status(400).json({ success: false, message: "No file uploaded" });
         return;
       }
 
@@ -44,44 +36,56 @@ router.post(
         return;
       }
 
-      let filesArray: Express.Multer.File[] = [];
-      if (Array.isArray(req.files)) {
-        filesArray = req.files;
+      const fileMimeType = req.file.mimetype;
+      console.log(`Uploaded file MIME type: ${fileMimeType}`);
+
+      let result: string;
+
+      if (fileMimeType === "image/png") {
+        // PNGファイルの場合
+        console.log(`File ${req.file.originalname} is an image. Processing as PNG...`);
+
+        // OCRで画像からテキストを抽出
+        const extractedText = await processImage(req.file.path);
+
+        console.log(`Extracted text from ${req.file.originalname}:`, extractedText);
+
+        // テキスト化したデータを元にプロンプトを生成
+        const prompt = generateCommand(subject, format, numQuestions, extractedText);
+
+        const response = await openai.chat.completions.create({
+          model: "gpt-3.5-turbo",
+          messages: [
+            { role: "system", content: "You are a helpful assistant." },
+            { role: "user", content: prompt },
+          ],
+        });
+
+        result = response.choices[0]?.message?.content || "No response";
+        console.log(`Received answer for ${req.file.originalname}:`, result);
       } else {
-        filesArray = Object.values(req.files).flat();
+        // その他のファイル（例: テキストやPDF）
+        console.log(`File ${req.file.originalname} is not an image. Processing as text...`);
+        const fileContent = await fs.readFile(req.file.path, "utf-8");
+        const prompt = generateCommand(subject, format, numQuestions, fileContent);
+
+        const response = await openai.chat.completions.create({
+          model: "gpt-3.5-turbo",
+          messages: [
+            { role: "system", content: "You are a helpful assistant." },
+            { role: "user", content: prompt },
+          ],
+        });
+
+        result = response.choices[0]?.message?.content || "No response";
+        console.log(`Received answer for ${req.file.originalname}:`, result);
       }
 
-      console.log("Uploaded files:", filesArray.map((file) => file.originalname));
+      // 一時ファイルを削除
+      await fs.unlink(req.file.path);
+      console.log(`Temporary file ${req.file.originalname} deleted.`);
 
-      const results: string[] = [];
-
-      for (const file of filesArray) {
-        try {
-          console.log(`Processing file: ${file.originalname}`);
-          const fileContent = await fs.readFile(file.path, "utf-8");
-          const prompt = generateCommand(subject, format, numQuestions, fileContent);
-          console.log(`Generated prompt for ${file.originalname}:`, prompt);
-
-          const response = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo",
-            messages: [
-              { role: "system", content: "You are a helpful assistant." },
-              { role: "user", content: prompt },
-            ],
-          });
-
-          const answer = response.choices[0]?.message?.content || "No response";
-          console.log(`Received answer for ${file.originalname}:`, answer);
-
-          results.push(answer);
-          await fs.unlink(file.path);
-          console.log(`Temporary file ${file.originalname} deleted.`);
-        } catch (fileError) {
-          console.error(`Error processing file ${file.originalname}:`, fileError);
-        }
-      }
-
-      res.status(200).json({ success: true, results });
+      res.status(200).json({ success: true, result });
     } catch (err) {
       console.error("Error in /chat-with-files:", err);
       res.status(500).json({ success: false, message: "Internal Server Error" });
@@ -89,6 +93,16 @@ router.post(
   }
 );
 
+/**
+ * 画像処理（例: OCRでテキスト化）
+ * @param filePath
+ * @returns 抽出したテキスト
+ */
+async function processImage(filePath: string): Promise<string> {
+  const extractedText = "Extracted text from image (dummy text)";
+  console.log(`Processing image at ${filePath}. Extracted text:`, extractedText);
+  return extractedText;
+}
 
 /**
  * 命令文を生成する関数

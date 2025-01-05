@@ -205,7 +205,7 @@ async function fetchAndSendFiles(subject, format, numQuestions) {
 
     for (const fileId of selectedFileIds) {
       const blob = await fetchFileAsBlob(fileId);
-      formData.append("files", blob, fileId + ".pdf"); 
+      formData.append("file", blob, `${fileId}.png`); // サーバーに送信するファイル名を指定
       // （拡張子やファイル名は適当につける）
     }
   
@@ -239,7 +239,7 @@ async function fetchFileAsBlob(fileId) {
 
   try {
     // 1. ファイルの形式を取得
-    const metadataUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?fields=mimeType&key=${apiKey}`;
+    const metadataUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?fields=mimeType,name&key=${apiKey}`; // nameも取得
     const metadataRes = await fetch(metadataUrl, {
       headers: { Authorization: `Bearer ${oauthToken}` },
     });
@@ -251,17 +251,27 @@ async function fetchFileAsBlob(fileId) {
 
     const metadata = await metadataRes.json();
     const mimeType = metadata.mimeType;
+    const fileName = metadata.name;
 
     console.log(`[fetchFileAsBlob] File MIME type: ${mimeType}`);
+    console.log(`[fetchFileAsBlob] File name: ${fileName}`);
+
+    // PNGファイルの判別
+    if (mimeType === "image/png") {
+      console.log(`[fetchFileAsBlob] The file is a PNG image.`);
+    } else {
+      console.log(`[fetchFileAsBlob] The file is not a PNG image.`);
+    }
 
     let url;
 
     // 2. Google Docs形式ならExport APIを利用
     if (mimeType.startsWith("application/vnd.google-apps.")) {
       // Google Docs, Spreadsheets, Slides の場合
-      const exportMimeType = mimeType === "application/vnd.google-apps.spreadsheet"
-        ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" // Excel形式
-        : "application/pdf"; // その他はPDF形式でエクスポート
+      const exportMimeType =
+        mimeType === "application/vnd.google-apps.spreadsheet"
+          ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" // Excel形式
+          : "application/pdf"; // その他はPDF形式でエクスポート
 
       url = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=${exportMimeType}`;
     } else {
@@ -284,7 +294,6 @@ async function fetchFileAsBlob(fileId) {
     const blob = await res.blob();
     console.log(`[fetchFileAsBlob] Successfully fetched file: ${fileId}`);
     return blob;
-
   } catch (err) {
     console.error(`[fetchFileAsBlob] Error occurred while fetching file: ${fileId}`, err);
     throw err;
