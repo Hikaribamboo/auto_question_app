@@ -1,8 +1,47 @@
 let tokenClient;
 let oauthToken;
+let selectedFileIds = []; // 選択されたファイルIDを一時保存
+let apiKey; // APIキー
+let clientId; // クライアントID
+
+// 初期化処理
+async function initializeApp() {
+  try {
+    console.log("[initializeApp] Fetching environment variables...");
+    const response = await fetch("/env");
+
+    if (!response.ok) {
+      throw new Error(`[initializeApp] HTTP error! Status: ${response.status}`);
+    }
+
+    const env = await response.json();
+    clientId = env.clientId;
+    apiKey = env.apiKey;
+
+    if (!apiKey) {
+      throw new Error("[initializeApp] Client ID or API Key is missing.");
+    }
+
+    console.log("[initializeApp] Environment variables loaded:", { clientId, apiKey });
+    initializeGisClient(); // GIS クライアントを初期化
+
+    // ボタンのクリックで Picker を表示
+    const pickFileButton = document.getElementById("pick-file");
+    console.log("Setting up 'Pick File' button event listener...");
+    pickFileButton.addEventListener("click", () => {
+      console.log("Pick File button clicked.");
+      tokenClient.requestAccessToken();
+      console.log("Access token requested");
+    });
+  } catch (error) {
+    console.error("Failed to initialize application:", error);
+    showError("アプリケーションの初期化に失敗しました。");
+  }
+
+}
 
 // GIS クライアントの初期化
-function initializeGisClient(clientId) {
+function initializeGisClient() {
   console.log("Starting GIS Client Initialization...");
 
   if (!google || !google.accounts || !google.accounts.oauth2) {
@@ -15,8 +54,8 @@ function initializeGisClient(clientId) {
   document.getElementById("pick-file").style.display = "block";
   try {
     tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
-      scope: "https://www.googleapis.com/auth/drive.file",
+      client_id: clientId, // 事前に取得したクライアントIDを使用
+      scope: "https://www.googleapis.com/auth/drive",
       callback: (response) => {
         console.log("Callback invoked with response:", response);
         if (response.access_token) {
@@ -66,7 +105,6 @@ async function createPicker() {
 }
 
 // Picker のコールバック
-let selectedFileIds = []; // 選択されたファイルIDを一時保存
 
 function pickerCallback(data) {
   if (data.action === google.picker.Action.PICKED) {
@@ -91,39 +129,6 @@ function showError(message) {
   const errorDiv = document.getElementById("file-info");
   errorDiv.innerText = message;
   errorDiv.style.color = "red";
-}
-
-// 初期化処理
-async function initializeApp() {
-  try {
-    const response = await fetch("/env");
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
-
-    const { clientId } = await response.json();
-    if (!clientId) {
-      throw new Error("Client ID is missing.");
-    }
-
-    console.log("Environment variables loaded. Initializing GIS client...");
-    initializeGisClient(clientId);
-
-    // ボタンのクリックで Picker を表示
-    const pickFileButton = document.getElementById("pick-file");
-    console.log("Setting up 'Pick File' button event listener...");
-    pickFileButton.addEventListener("click", () => {
-      console.log("Pick File button clicked.");
-      tokenClient.requestAccessToken();
-      console.log("Access token requested");
-    });
-  } catch (error) {
-    console.error("Failed to initialize application:", error);
-    showError("アプリケーションの初期化に失敗しました。");
-  }
-
-  startAction()
-  
 }
 
 // DOM ロード完了時に実行
@@ -178,22 +183,36 @@ document.addEventListener("DOMContentLoaded", () => {
             formatSelect.appendChild(option);
         });
     }
+
+    // 「作問開始」ボタンが押されたとき
+  startButton.addEventListener("click", async () => {
+    // pickしたファイルIDが入った selectedFileIds を使って処理
+    if (selectedFileIds.length === 0) {
+      alert("ファイルを選択していません！");
+      return;
+    }
+    const selectedSubject = subjectSelect.value;
+    const selectedFormat = formatSelect.value;
+    const selectedCount = questionCount.value;
+    await fetchAndSendFiles(selectedSubject, selectedFormat, selectedCount);
+  });
   
 });
 
 // バイナリデータを取得して送信
 async function fetchAndSendFiles(subject, format, numQuestions) {
     const formData = new FormData();
-  
-    for (const file of selectedFiles) {
-      const fileContent = await fetchFileContent(file.id);
-      formData.append("files", new Blob([fileContent]), file.name);
+
+    for (const fileId of selectedFileIds) {
+      const blob = await fetchFileAsBlob(fileId);
+      formData.append("files", blob, fileId + ".pdf"); 
+      // （拡張子やファイル名は適当につける）
     }
   
     formData.append("subject", subject);
     formData.append("format", format);
     formData.append("numQuestions", numQuestions);
-  
+
     try {
       const response = await fetch("/chat-with-files", {
         method: "POST",
@@ -213,35 +232,66 @@ async function fetchAndSendFiles(subject, format, numQuestions) {
     }
   }
   
-  // Google Drive API を使用してファイルのバイナリデータを取得
-  async function fetchFileContent(fileId) {
-    const response = await gapi.client.request({
-      path: `/drive/v3/files/${fileId}`,
-      method: "GET",
-      params: { alt: "media" },
+// 1. Google Drive API を使用してファイルのバイナリデータを取得する関数
+async function fetchFileAsBlob(fileId) {
+  console.log(`[fetchFileAsBlob] Start fetching file: ${fileId}`);
+  console.log("This is token:", oauthToken);
+
+  try {
+    // 1. ファイルの形式を取得
+    const metadataUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?fields=mimeType&key=${apiKey}`;
+    const metadataRes = await fetch(metadataUrl, {
       headers: { Authorization: `Bearer ${oauthToken}` },
     });
-  
-    return response.body;
-  }
 
-async function startAction() {
-    const startButton = document.getElementById("start-creation");
-    // 作問開始ボタンが押されたときのイベント
-    startButton.addEventListener("click", async () => {
-    const selectedSubject = subjectSelect.value;
-    const selectedFormat = formatSelect.value;
-    const selectedCount = questionCount.value;
-  
-    if (!selectedSubject || !selectedFormat || !selectedCount || selectedFiles.length === 0) {
-      alert("全てのフィールドを入力し、ファイルを選択してください！");
-      return;
+    if (!metadataRes.ok) {
+      const errorDetails = await metadataRes.json();
+      throw new Error(`Failed to fetch file metadata: ${errorDetails.error.message}`);
     }
-  
-    await fetchAndSendFiles(selectedSubject, selectedFormat, selectedCount);
-  });
+
+    const metadata = await metadataRes.json();
+    const mimeType = metadata.mimeType;
+
+    console.log(`[fetchFileAsBlob] File MIME type: ${mimeType}`);
+
+    let url;
+
+    // 2. Google Docs形式ならExport APIを利用
+    if (mimeType.startsWith("application/vnd.google-apps.")) {
+      // Google Docs, Spreadsheets, Slides の場合
+      const exportMimeType = mimeType === "application/vnd.google-apps.spreadsheet"
+        ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" // Excel形式
+        : "application/pdf"; // その他はPDF形式でエクスポート
+
+      url = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=${exportMimeType}`;
+    } else {
+      // バイナリファイルの場合
+      url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+    }
+
+    // 3. ファイルを取得
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${oauthToken}` },
+    });
+
+    console.log(`[fetchFileAsBlob] fetch response status: ${res.status} ${res.statusText}`);
+
+    if (!res.ok) {
+      const errorDetails = await res.json();
+      throw new Error(`Failed to fetch file data: ${errorDetails.error.message}`);
+    }
+
+    const blob = await res.blob();
+    console.log(`[fetchFileAsBlob] Successfully fetched file: ${fileId}`);
+    return blob;
+
+  } catch (err) {
+    console.error(`[fetchFileAsBlob] Error occurred while fetching file: ${fileId}`, err);
+    throw err;
+  }
 }
+
+
 
 // GIS クライアントのロードを保証
 window.onload = initializeApp;
-

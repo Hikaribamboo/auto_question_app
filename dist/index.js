@@ -25,7 +25,7 @@ app.get('/auth', (req, res) => {
     try {
         const authUrl = oauth2Client.generateAuthUrl({
             access_type: 'offline',
-            scope: ['https://www.googleapis.com/auth/drive.file'],
+            scope: ['https://www.googleapis.com/auth/drive'],
         });
         res.redirect(authUrl);
     }

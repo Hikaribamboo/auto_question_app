@@ -4,29 +4,39 @@ import fs from "fs/promises";
 import OpenAI from "openai";
 import { CustomRequest } from "./types"; // あなたが定義したCustomRequestをインポート
 
+// 環境変数の読み込み
+import dotenv from "dotenv";
+dotenv.config();
+
+console.log("API Key used for OpenAI:", process.env.OPENAI_API_KEY);
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY ?? "",
 });
+
+console.log("OpenAI instance initialized:", openai);
 
 const upload = multer({ dest: "temp/" });
 const router = Router();
 
 router.post(
   "/chat-with-files",
-  upload.array("files"), // <input name="files" multiple>
+  upload.array("files"),
   async (req: CustomRequest, res: Response) => {
     try {
-      // ファイルがない
+      console.log("Request received at /chat-with-files");
+
       if (!req.files || (Array.isArray(req.files) && req.files.length === 0)) {
-        // 「return res.status(...).json(...)」ではなく、
-        // まず res.status(...).json(...) を呼び出し、その後に単独で return;
+        console.warn("No files uploaded");
         res.status(400).json({ success: false, message: "No files uploaded" });
         return;
       }
 
-      // body が不完全
       const { subject, format, numQuestions } = req.body;
+      console.log("Request body:", { subject, format, numQuestions });
+
       if (!subject || !format || !numQuestions) {
+        console.warn("Missing required fields: subject, format, or numQuestions");
         res.status(400).json({
           success: false,
           message: "Missing required fields: subject, format, or numQuestions",
@@ -34,7 +44,6 @@ router.post(
         return;
       }
 
-      // req.files が配列かオブジェクトかで分ける
       let filesArray: Express.Multer.File[] = [];
       if (Array.isArray(req.files)) {
         filesArray = req.files;
@@ -42,32 +51,36 @@ router.post(
         filesArray = Object.values(req.files).flat();
       }
 
+      console.log("Uploaded files:", filesArray.map((file) => file.originalname));
+
       const results: string[] = [];
 
       for (const file of filesArray) {
-        // ファイル内容を読み込み（UTF-8）
-        const fileContent = await fs.readFile(file.path, "utf-8");
+        try {
+          console.log(`Processing file: ${file.originalname}`);
+          const fileContent = await fs.readFile(file.path, "utf-8");
+          const prompt = generateCommand(subject, format, numQuestions, fileContent);
+          console.log(`Generated prompt for ${file.originalname}:`, prompt);
 
-        // subject/format/numQuestions に基づいて命令文を生成
-        const prompt = generateCommand(subject, format, numQuestions, fileContent);
+          const response = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: [
+              { role: "system", content: "You are a helpful assistant." },
+              { role: "user", content: prompt },
+            ],
+          });
 
-        // ChatGPT に送信
-        const response = await openai.chat.completions.create({
-          model: "gpt-3.5-turbo",
-          messages: [
-            { role: "system", content: "You are a helpful assistant." },
-            { role: "user", content: prompt },
-          ],
-        });
+          const answer = response.choices[0]?.message?.content || "No response";
+          console.log(`Received answer for ${file.originalname}:`, answer);
 
-        const answer = response.choices[0]?.message?.content || "No response";
-        results.push(answer);
-
-        // 一時ファイル削除
-        await fs.unlink(file.path);
+          results.push(answer);
+          await fs.unlink(file.path);
+          console.log(`Temporary file ${file.originalname} deleted.`);
+        } catch (fileError) {
+          console.error(`Error processing file ${file.originalname}:`, fileError);
+        }
       }
 
-      // 処理が終わったらクライアントに返す
       res.status(200).json({ success: true, results });
     } catch (err) {
       console.error("Error in /chat-with-files:", err);
@@ -75,6 +88,7 @@ router.post(
     }
   }
 );
+
 
 /**
  * 命令文を生成する関数
