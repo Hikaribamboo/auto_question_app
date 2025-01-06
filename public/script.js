@@ -205,7 +205,7 @@ async function fetchAndSendFiles(subject, format, numQuestions) {
 
     for (const fileId of selectedFileIds) {
       const blob = await fetchFileAsBlob(fileId);
-      formData.append("file", blob, `${fileId}.png`); // サーバーに送信するファイル名を指定
+      formData.append("files", blob, `${fileId}.png`); // サーバーに送信するファイル名を指定
       // （拡張子やファイル名は適当につける）
     }
     console.log(formData)

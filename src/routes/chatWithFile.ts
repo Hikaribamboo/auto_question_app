@@ -86,7 +86,7 @@ router.post(
         res.status(400).json({ success: false, message: "No valid files uploaded" });
         return;
       }
-
+      console.log(combinedText)
       // 作問回数を計算
       const maxQuestionsPerRequest = 10;
       const numRequests = Math.ceil(numQuestionsInt / maxQuestionsPerRequest); // 商＋1で計算
@@ -111,7 +111,7 @@ router.post(
         console.log(`Generated command for batch ${i + 1}:`, command);
 
         const chatResponse = await openai.chat.completions.create({
-          model: "gpt-4",
+          model: "gpt-4o-mini-2024-07-18",
           messages: [
             { role: "system", content: "You are a helpful assistant." },
             { role: "user", content: command },
@@ -123,6 +123,7 @@ router.post(
         }
 
         const result = chatResponse.choices[0]?.message?.content || "";
+        console.log("This is result",result)
         const tableData = await processChatResponse([result]); // `result` を配列に変換して渡す
         allQuestions = allQuestions.concat(tableData);
       }
