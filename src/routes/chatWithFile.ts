@@ -20,14 +20,14 @@ const router = Router();
 
 router.post(
   "/chat-with-files",
-  upload.single("file"),
+  upload.array("files"), // 複数ファイルを受け取る
   async (req: CustomRequest, res: Response) => {
     try {
       console.log("Request received at /chat-with-files");
 
-      if (!req.file) {
-        console.warn("No file uploaded");
-        res.status(400).json({ success: false, message: "No file uploaded" });
+      if (!req.files || req.files.length === 0) {
+        console.warn("No files uploaded");
+        res.status(400).json({ success: false, message: "No files uploaded" });
         return;
       }
 
@@ -43,74 +43,102 @@ router.post(
         return;
       }
 
-      const fileMimeType = req.file.mimetype;
-      console.log(`Uploaded file MIME type: ${fileMimeType}`);
-
-      let fileContent: string;
-
-      if (fileMimeType === "image/png") {
-        console.log(`File ${req.file.originalname} is a PNG image. Performing OCR...`);
-      
-        try {
-          // Tesseract.jsを使って画像からテキストを抽出
-          const { data: { text } } = await Tesseract.recognize(req.file.path, "jpn", {
-            langPath: "./tessdata", // ダウンロードした日本語データへのパス
-          });
-      
-          console.log(`Extracted text from ${req.file.originalname}:`, text);
-          fileContent = text.trim();
-        } catch (ocrError) {
-          console.error("Error performing OCR:", ocrError);
-          res.status(500).json({ success: false, message: "Error processing image file" });
-          return;
-        }
-      } else if (fileMimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
-        // DOCXファイルをテキストに変換
-        const fileBuffer = await fs.readFile(req.file.path);
-        const { value } = await mammoth.extractRawText({ buffer: fileBuffer });
-        fileContent = value.trim();
-      } else if (fileMimeType === "application/pdf") {
-        // PDFファイルをテキストに変換
-        const fileBuffer = await fs.readFile(req.file.path);
-        const pdfData = await pdfParse(fileBuffer);
-        fileContent = pdfData.text.trim();
-      } else {
-        console.error("Unsupported file type:", fileMimeType);
-        res.status(400).json({ success: false, message: "Unsupported file type" });
+      const numQuestionsInt = parseInt(numQuestions, 10);
+      if (isNaN(numQuestionsInt) || numQuestionsInt <= 0) {
+        res.status(400).json({ success: false, message: "Invalid numQuestions value" });
         return;
       }
 
-      console.log(`Extracted text from file: ${fileContent.substring(0, 100)}...`); // 最初の100文字を表示
+      // テキスト化された全ファイルの内容を結合
+      let combinedText = "";
+      // req.files の型を確認して配列として扱えるようにキャスト
+      if (Array.isArray(req.files)) {
+        for (const file of req.files as Express.Multer.File[]) {
+          const fileMimeType = file.mimetype;
+          console.log(`Processing file: ${file.originalname}, MIME type: ${fileMimeType}`);
 
-      // 命令文を生成
-      const command = generateCommand(subject, format, numQuestions, fileContent);
-      console.log("Generated command:", command);
+          let fileContent = "";
 
-      // ChatGPT API 呼び出し
-      const chatResponse = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [
-          { role: "system", content: "You are a helpful assistant." },
-          { role: "user", content: command },
-        ],
-      });
+          if (fileMimeType === "image/png") {
+            const { data: { text } } = await Tesseract.recognize(file.path, "jpn", {
+              langPath: "./tessdata",
+            });
+            fileContent = text.trim();
+          } else if (fileMimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+            const fileBuffer = await fs.readFile(file.path);
+            const { value } = await mammoth.extractRawText({ buffer: fileBuffer });
+            fileContent = value.trim();
+          } else if (fileMimeType === "application/pdf") {
+            const fileBuffer = await fs.readFile(file.path);
+            const pdfData = await pdfParse(fileBuffer);
+            fileContent = pdfData.text.trim();
+          } else {
+            console.warn("Unsupported file type:", fileMimeType);
+            res.status(400).json({ success: false, message: "Unsupported file type" });
+            return;
+          }
 
-      const result = chatResponse.choices[0]?.message?.content || "No response";
-      // 一時ファイルを削除
-      await fs.unlink(req.file.path);
+          console.log(`Extracted text from file: ${fileContent.substring(0, 100)}...`); // 最初の100文字を表示
+          combinedText += fileContent + "\n"; // 結合
+        }
+      } else {
+        console.error("req.files is not an array.");
+        res.status(400).json({ success: false, message: "No valid files uploaded" });
+        return;
+      }
 
-      const tableData = processChatResponse(result)
+      // 作問回数を計算
+      const maxQuestionsPerRequest = 10;
+      const numRequests = Math.ceil(numQuestionsInt / maxQuestionsPerRequest); // 商＋1で計算
 
-      // JSON形式で返す
+      // 分割された結果を保持する配列
+      let allQuestions: { question: string; answer: string; a: string; b: string; c: string }[] = [];
+
+      // テキストを等分に分割
+      const splitTexts = combinedText.split(/\s+/); // 空白で分割
+      const chunkSize = Math.ceil(splitTexts.length / numRequests);
+
+      for (let i = 0; i < numRequests; i++) {
+        const chunk = splitTexts.slice(i * chunkSize, (i + 1) * chunkSize).join(" ");
+
+        // 今回のリクエストで作問する数
+        const questionsToRequest = Math.min(
+          maxQuestionsPerRequest,
+          numQuestionsInt - i * maxQuestionsPerRequest
+        ).toString(); // 数値を文字列に変換        
+
+        const command = generateCommand(subject, format, questionsToRequest, chunk);
+        console.log(`Generated command for batch ${i + 1}:`, command);
+
+        const chatResponse = await openai.chat.completions.create({
+          model: "gpt-4",
+          messages: [
+            { role: "system", content: "You are a helpful assistant." },
+            { role: "user", content: command },
+          ],
+        });
+
+        if (!chatResponse.choices || chatResponse.choices.length === 0) {
+          throw new Error("Invalid response from ChatGPT API.");
+        }
+
+        const result = chatResponse.choices[0]?.message?.content || "";
+        const tableData = await processChatResponse([result]); // `result` を配列に変換して渡す
+        allQuestions = allQuestions.concat(tableData);
+      }
+
+      // 最終結果をクライアントに返却
       res.status(200).json({
         success: true,
-        tableData, // CSVデータとして返す
+        tableData: allQuestions,
       });
     } catch (err) {
+      console.error("Error processing request:", err);
       res.status(500).json({ success: false, message: "Internal Server Error" });
     }
   }
 );
+
 
 /**
  * 命令文を生成する関数
@@ -130,25 +158,50 @@ function generateCommand(
 
   const sharedFourChoiceCommand = `
     Name the columns question, answer, a, b, and c. 
-    Don't reuse the same words too much, and make b, c, and d words that can't be answers. 
-    Also, don't use words that are too simple.
+    Ensure all questions are fill-in-the-blank style multiple-choice questions.
+    Use the provided content to generate realistic and challenging distractors (a, b, c) that are not correct answers.
+    Avoid reusing the same options across questions, and ensure that the questions are varied.
+    Also, avoid using overly simple or trivial options as distractors.
+    Format the output as a **valid JSON array** with the following structure:
+    [
+      {
+        "question": "Question text here",
+        "answer": "Correct answer here",
+        "a": "Option a here",
+        "b": "Option b here",
+        "c": "Option c here"
+      },
+      ...
+    ]
+    Ensure the output is **strictly valid JSON** and does not include any additional text outside the JSON format.
   `;
 
-  if (subject === "英語" && format === "四択（語彙）") {
-    return `
-      ${baseCommand}
-      Create one question for each English word in the attached file.
-      Avoid using the same words in multiple choices.
-      ${sharedFourChoiceCommand}
-    `;
-  } else if (subject === "英語" && format === "四択（文法）") {
-    return `
-      ${baseCommand}
-      Learn the grammar of the attached file and create questions from its contents.
-      Avoid using content with the same distribution.
-      ${sharedFourChoiceCommand}
-    `;
-  }
+if (subject === "英語" && format === "四択（語彙）") {
+  return `
+    ${baseCommand}
+    Create one fill-in-the-blank vocabulary question for each English word in the attached file.
+    Use synonyms or related meanings as distractors (a, b, c).
+    ${sharedFourChoiceCommand}
+  `;
+} else if (subject === "英語" && format === "四択（文法）") {
+  return `
+    ${baseCommand}
+    Use the grammar rules and examples in the attached file to create fill-in-the-blank multiple-choice questions.
+    Ensure the blanks target specific grammatical rules or structures, such as verb tense, subject-verb agreement, or conjunction usage.
+    example: [
+      {
+        "question": "I wish we ______ the project earlier.",
+        "answer": "had completed",
+        "a": " completed",
+        "b": "will complete",
+        "c": "have completed"
+      },
+      ...
+    ]
+    ${sharedFourChoiceCommand}
+  `;
+}
+
 
   // デフォルト命令文（その他の科目や形式）
   return `
@@ -157,53 +210,43 @@ function generateCommand(
   `;
 }
 
-async function processChatResponse(response: string): Promise<{ question: string; answer: string; a: string; b: string; c: string }[]> {
+async function processChatResponse(responses: string[]): Promise<{ question: string; answer: string; a: string; b: string; c: string }[]> {
   try {
-    // 1. JSON形式のレスポンスをパース
-    const responseObject = JSON.parse(response);
+    let allRows: { question: string; answer: string; a: string; b: string; c: string }[] = []; // すべての行を格納する配列
 
-    // 2. "result"フィールドを抽出
-    if (!responseObject.success || !responseObject.result) {
-      throw new Error("Invalid response format. 'success' or 'result' field is missing.");
-    }
+    // 各レスポンスを処理
+    responses.forEach((response, index) => {
+      try {
+        const jsonStartIndex = response.indexOf("[");
+        const jsonEndIndex = response.lastIndexOf("]");
 
-    const resultText: string = responseObject.result;
-
-    // 3. "result"を処理して表形式に変換
-    const rows: { question: string; answer: string; a: string; b: string; c: string }[] = [];
-    const lines: string[] = resultText.split("\n").filter((line: string) => line.trim() !== "");
-
-    let currentRow: { question?: string; answer?: string; a?: string; b?: string; c?: string } = {};
-
-    lines.forEach((line: string) => {
-      if (line.startsWith("Question")) {
-        if (currentRow.question) {
-          rows.push(currentRow as { question: string; answer: string; a: string; b: string; c: string });
-          currentRow = {};
+        if (jsonStartIndex === -1 || jsonEndIndex === -1) {
+          throw new Error(`Valid JSON not found in response ${index + 1}`);
         }
-        currentRow.question = line.replace(/^Question \d+: /, "").trim();
-      } else if (line.startsWith("a)")) {
-        currentRow.a = line.replace(/^a\)/, "").trim();
-      } else if (line.startsWith("b)")) {
-        currentRow.b = line.replace(/^b\)/, "").trim();
-      } else if (line.startsWith("c)")) {
-        currentRow.c = line.replace(/^c\)/, "").trim();
-      } else if (line.startsWith("d)")) {
-        currentRow.answer = line.replace(/^d\)/, "").trim();
+
+        const jsonString = response.substring(jsonStartIndex, jsonEndIndex + 1);
+        const rows: { question: string; answer: string; a: string; b: string; c: string }[] = JSON.parse(jsonString);
+
+        // 必須フィールドのチェック
+        rows.forEach((row, rowIndex) => {
+          if (!row.question || !row.answer || !row.a || !row.b || !row.c) {
+            throw new Error(
+              `Missing required fields in response ${index + 1}, row ${rowIndex + 1}`
+            );
+          }
+        });
+
+        allRows = allRows.concat(rows); // データを結合
+      } catch (error) {
+        console.error(`Error processing response ${index + 1}:`, error);
       }
     });
 
-    // 最後の行を追加
-    if (currentRow.question) {
-      rows.push(currentRow as { question: string; answer: string; a: string; b: string; c: string });
-    }
-
-    return rows;
+    return allRows;
   } catch (error) {
-    console.error("Error processing chat response:", error);
+    console.error("Error processing multiple chat responses:", error);
     throw error;
   }
 }
-
 
 export default router;

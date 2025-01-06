@@ -208,7 +208,7 @@ async function fetchAndSendFiles(subject, format, numQuestions) {
       formData.append("file", blob, `${fileId}.png`); // サーバーに送信するファイル名を指定
       // （拡張子やファイル名は適当につける）
     }
-  
+    console.log(formData)
     formData.append("subject", subject);
     formData.append("format", format);
     formData.append("numQuestions", numQuestions);
@@ -304,26 +304,49 @@ async function fetchFileAsBlob(fileId) {
 window.onload = initializeApp;
 
 // テーブル形式でHTMLに表示
-function displayTableOutput(csvData) {
-  const outputSection = document.getElementById("output-display");
+function displayTableOutput(tableData) {
+  const outputSection = document.getElementById("output-section"); // HTMLの表示場所
   outputSection.innerHTML = ""; // 既存の内容をクリア
 
-  const rows = csvData.split("\n").map((row) => row.split(","));
+  // テーブル要素を作成
   const table = document.createElement("table");
-  table.style.border = "1px solid #ccc";
-  table.style.borderCollapse = "collapse";
+  table.border = "1"; // 枠線を付ける
+  table.style.borderCollapse = "collapse"; // 枠線を結合
+  table.style.width = "100%";
 
-  rows.forEach((row, index) => {
+  // テーブルヘッダーを作成
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+  const headers = ["Question", "Answer", "A", "B", "C"]; // 列名
+  headers.forEach((headerText) => {
+    const th = document.createElement("th");
+    th.style.padding = "8px";
+    th.style.textAlign = "left";
+    th.style.backgroundColor = "#f2f2f2";
+    th.textContent = headerText;
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  // テーブルボディを作成
+  const tbody = document.createElement("tbody");
+  tableData.forEach((row) => {
     const tr = document.createElement("tr");
-    row.forEach((cell) => {
-      const td = document.createElement(index === 0 ? "th" : "td");
-      td.textContent = cell.trim();
-      td.style.border = "1px solid #ccc";
+
+    // 各行のセルを追加
+    ["question", "answer", "a", "b", "c"].forEach((key) => {
+      const td = document.createElement("td");
       td.style.padding = "8px";
+      td.style.border = "1px solid #ddd";
+      td.textContent = row[key];
       tr.appendChild(td);
     });
-    table.appendChild(tr);
-  });
 
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+
+  // テーブルを出力セクションに追加
   outputSection.appendChild(table);
 }
