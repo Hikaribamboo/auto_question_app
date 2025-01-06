@@ -6,7 +6,6 @@ import OpenAI from "openai";
 import { CustomRequest } from "./types";
 import pdfParse from "pdf-parse"; // PDFをテキストに変換するために利用
 import Tesseract from "tesseract.js"; // OCRライブラリのインポート
-
 // 環境変数の読み込み
 import dotenv from "dotenv";
 dotenv.config();
@@ -123,9 +122,9 @@ router.post(
         }
 
         const result = chatResponse.choices[0]?.message?.content || "";
-        console.log("This is result",result)
         const tableData = await processChatResponse([result]); // `result` を配列に変換して渡す
         allQuestions = allQuestions.concat(tableData);
+
       }
 
       // 最終結果をクライアントに返却
@@ -140,6 +139,7 @@ router.post(
   }
 );
 
+export default router;
 
 /**
  * 命令文を生成する関数
@@ -249,5 +249,3 @@ async function processChatResponse(responses: string[]): Promise<{ question: str
     throw error;
   }
 }
-
-export default router;
