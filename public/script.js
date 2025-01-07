@@ -373,17 +373,19 @@ async function saveToGoogleSheets(result) {
   try {
     // Google Sheets API を呼び出してデータを追加
     let spreadsheetId; // 外で宣言する
+    let sheetName; // シングルクォートを省略
     const format = result.format;
 
     if (format === "四択（語彙）") {
       spreadsheetId = "1StVPa6k7UC8dlOwFLuL6aERpBuRQv2SUMqCU2xFieDw";
+      sheetName = encodeURIComponent("vocab");
     } else if (format === "四択（文法）") {
-      spreadsheetId = "1mo4hZBazGTIU5zMKozefzfDw-twznv2L94i6a3nWAMY";
+      spreadsheetId = "1StVPa6k7UC8dlOwFLuL6aERpBuRQv2SUMqCU2xFieDw";
+      sheetName = encodeURIComponent("grammar");
     } else {
       throw new Error("Invalid format type");
     }
     
-    const sheetName = encodeURIComponent("Sheet1"); // シングルクォートを省略
     const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
 
       method: "POST",
