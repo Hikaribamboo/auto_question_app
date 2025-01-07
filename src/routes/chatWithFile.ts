@@ -131,6 +131,7 @@ router.post(
       res.status(200).json({
         success: true,
         tableData: allQuestions,
+        format: format
       });
     } catch (err) {
       console.error("Error processing request:", err);
@@ -149,59 +150,59 @@ function generateCommand(
   format: string,
   numQuestions: string,
   fileContent: string
-): string {
-  const baseCommand = `
-    Please create ${numQuestions} ${subject} questions according to the following format.
-    Question format: ${format}.
-    Number of questions: ${numQuestions}.
-    File contents: ${fileContent}
-  `;
+  ): string {
+    const baseCommand = `
+      Please create ${numQuestions} ${subject} questions according to the following format.
+      Question format: ${format}.
+      Number of questions: ${numQuestions}.
+      File contents: ${fileContent}
+    `;
 
-  const sharedFourChoiceCommand = `
-    Name the columns question, answer, a, b, and c. 
-    Ensure all questions are fill-in-the-blank style multiple-choice questions.
-    Use the provided content to generate realistic and challenging distractors (a, b, c) that are not correct answers.
-    Avoid reusing the same options across questions, and ensure that the questions are varied.
-    Also, avoid using overly simple or trivial options as distractors.
-    Format the output as a **valid JSON array** with the following structure:
-    [
-      {
-        "question": "Question text here",
-        "answer": "Correct answer here",
-        "a": "Option a here",
-        "b": "Option b here",
-        "c": "Option c here"
-      },
-      ...
-    ]
-    Ensure the output is **strictly valid JSON** and does not include any additional text outside the JSON format.
-  `;
+    const sharedFourChoiceCommand = `
+      Name the columns question, answer, a, b, and c. 
+      Ensure all questions are fill-in-the-blank style multiple-choice questions.
+      Use the provided content to generate realistic and challenging distractors (a, b, c) that are not correct answers.
+      Avoid reusing the same options across questions, and ensure that the questions are varied.
+      Also, avoid using overly simple or trivial options as distractors.
+    `;
 
-if (subject === "英語" && format === "四択（語彙）") {
-  return `
-    ${baseCommand}
-    Create one fill-in-the-blank vocabulary question for each English word in the attached file.
-    Use synonyms or related meanings as distractors (a, b, c).
-    ${sharedFourChoiceCommand}
-  `;
-} else if (subject === "英語" && format === "四択（文法）") {
-  return `
-    ${baseCommand}
-    Use the grammar rules and examples in the attached file to create fill-in-the-blank multiple-choice questions.
-    Ensure the blanks target specific grammatical rules or structures, such as verb tense, subject-verb agreement, or conjunction usage.
-    example: [
-      {
-        "question": "I wish we ______ the project earlier.",
-        "answer": "had completed",
-        "a": " completed",
-        "b": "will complete",
-        "c": "have completed"
-      },
-      ...
-    ]
-    ${sharedFourChoiceCommand}
-  `;
-}
+  if (subject === "英語" && format === "四択（語彙）") {
+    return `
+      ${baseCommand}
+      Create one fill-in-the-blank vocabulary question for each English word in the attached file.
+      Use synonyms or related meanings as distractors (a, b, c).
+      Ensure the output is **strictly valid JSON** and does not include any additional text outside the JSON format.
+      [
+        {
+          "question": "The artist wants to _____ a masterpiece for the exhibition.",
+          "answer": "create",
+          "a": "dismantle",
+          "b": "overlook",
+          "c": "replicate"
+        },
+        ...
+      ]
+      ${sharedFourChoiceCommand}
+    `;
+  } else if (subject === "英語" && format === "四択（文法）") {
+    return `
+      ${baseCommand}
+      Use the grammar rules and examples in the attached file to create fill-in-the-blank multiple-choice questions.
+      Ensure the blanks target specific grammatical rules or structures, such as verb tense, subject-verb agreement, or conjunction usage.
+      Ensure the output is **strictly valid JSON** and does not include any additional text outside the JSON format.
+      example: [
+        {
+          "question": "I wish we ______ the project earlier.",
+          "answer": "had completed",
+          "a": " completed",
+          "b": "will complete",
+          "c": "have completed"
+        },
+        ...
+      ]
+      ${sharedFourChoiceCommand}
+    `;
+  }
 
 
   // デフォルト命令文（その他の科目や形式）

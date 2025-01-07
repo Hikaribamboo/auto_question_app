@@ -218,11 +218,12 @@ async function fetchAndSendFiles(subject, format, numQuestions) {
         method: "POST",
         body: formData,
       });
-  
+      
       const result = await response.json();
-      const spreadsheetId = "1mo4hZBazGTIU5zMKozefzfDw-twznv2L94i6a3nWAMY"
+
+      console.log("This is result before make jason", result)
       if (result.success) {
-        saveToGoogleSheets(spreadsheetId, result)
+        saveToGoogleSheets(result)
         displayTableOutput(result.tableData); // テーブル形式で表示
       } else {
         throw new Error(result.message);
@@ -353,24 +354,38 @@ function displayTableOutput(tableData) {
 }
 
 // Google Sheets にデータを保存する関数
-async function saveToGoogleSheets(spreadsheetId, result) {
+async function saveToGoogleSheets(result) {
   console.log("Saving to Google Sheets...");
 
-  // データをスプレッドシート形式に変換
-  const rows = [
-    ["Question", "Answer", "Option A", "Option B", "Option C"], // ヘッダー行
-    ...result.map((item) => [
-      item.question,
-      item.answer,
-      item.a,
-      item.b,
-      item.c,
-    ]),
-  ];
+  // result.tableDataを確認してデータをスプレッドシート形式に変換
+  const rows = result.tableData.map((item) => [
+    item.question,
+    item.answer,
+    item.a,
+    item.b,
+    item.c,
+  ]);
+  
+
+  console.log(rows); // rowsに変換されたデータ
+
 
   try {
     // Google Sheets API を呼び出してデータを追加
-    const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
+    let spreadsheetId; // 外で宣言する
+    const format = result.format;
+
+    if (format === "四択（語彙）") {
+      spreadsheetId = "1StVPa6k7UC8dlOwFLuL6aERpBuRQv2SUMqCU2xFieDw";
+    } else if (format === "四択（文法）") {
+      spreadsheetId = "1mo4hZBazGTIU5zMKozefzfDw-twznv2L94i6a3nWAMY";
+    } else {
+      throw new Error("Invalid format type");
+    }
+    
+    const sheetName = encodeURIComponent("Sheet1"); // シングルクォートを省略
+    const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
+
       method: "POST",
       headers: {
         "Authorization": `Bearer ${oauthToken}`, // フロントエンドで取得済みの OAuth トークン
@@ -386,10 +401,11 @@ async function saveToGoogleSheets(spreadsheetId, result) {
     } else {
       const errorDetails = await response.json();
       console.error("Failed to save data to Google Sheets:", errorDetails);
-      alert("Google Sheets への保存に失敗しました。");
+      alert(`Error: ${errorDetails.error.message}`);
     }
   } catch (error) {
     console.error("Error saving data to Google Sheets:", error);
     alert("Google Sheets への保存中にエラーが発生しました。");
   }
 }
+
