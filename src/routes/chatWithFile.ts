@@ -152,27 +152,25 @@ function generateCommand(
   fileContent: string
   ): string {
     const baseCommand = `
-      Please create ${numQuestions} ${subject} questions according to the following format.
-      Question format: ${format}.
-      Number of questions: ${numQuestions}.
-      File contents: ${fileContent}
+      ${subject}の問題を以下の形式と資料を基に ${numQuestions} 問作成してください.
+      問題形式: ${format}.
+      資料: ${fileContent}
     `;
 
     const sharedFourChoiceCommand = `
-      Name the columns question, answer, a, b, and c. 
-      Ensure all questions are fill-in-the-blank style multiple-choice questions.
-      Use the provided content to generate realistic and challenging distractors (a, b, c) that are not correct answers.
-      Avoid reusing the same options across questions, and ensure that the questions are varied.
-      Also, avoid using overly simple or trivial options as distractors.
+      ４列にそれぞれ[answer, a, b, and c] という名前を付けます。それぞれ
+      すべての質問が空欄補充形式の複数選択質問であることを確認します。
+      提供されたコンテンツを使用して、正解ではない現実的で難しい誤答 (a、b、c) を生成します。
+      質問間で同じオプションを再利用することは避け、質問が多様であることを確認します。
+      また、誤答として過度に単純または些細なオプションを使用することは避けます。
     `;
 
   if (subject === "英語" && format === "四択（語彙）") {
     return `
       ${baseCommand}
-      Create one fill-in-the-blank vocabulary question for each English word in the attached file.
-      Use synonyms or related meanings as distractors (a, b, c).
-      Ensure the output is **strictly valid JSON** and does not include any additional text outside the JSON format.
-      [
+      添付ファイル内の各英語の単語に対して、空欄補充語彙問題を 1 つ作成してください。
+      出力が **厳密に有効な JSON** であり、JSON 形式以外の追加テキストが含まれていないことを確認します
+      example:[
         {
           "question": "The artist wants to _____ a masterpiece for the exhibition.",
           "answer": "create",
@@ -187,9 +185,9 @@ function generateCommand(
   } else if (subject === "英語" && format === "四択（文法）") {
     return `
       ${baseCommand}
-      Use the grammar rules and examples in the attached file to create fill-in-the-blank multiple-choice questions.
-      Ensure the blanks target specific grammatical rules or structures, such as verb tense, subject-verb agreement, or conjunction usage.
-      Ensure the output is **strictly valid JSON** and does not include any additional text outside the JSON format.
+      添付ファイルの文法規則と例を使用して、空欄補充の複数選択問題を作成します。
+      空欄が、動詞の時制、主語と動詞の一致、接続詞の使用法など、特定の文法規則または構造を対象としていることを確認します。
+      出力が**厳密に有効な JSON**であり、JSON 形式以外の追加テキストが含まれていないことを確認します。
       example: [
         {
           "question": "I wish we ______ the project earlier.",
@@ -202,9 +200,26 @@ function generateCommand(
       ]
       ${sharedFourChoiceCommand}
     `;
+  } else if (subject === "英語" && format === "四択（熟語）") {
+    return `
+      ${baseCommand}
+      資料内の各英熟語に対して空欄補充熟語問題を 1 つ作成してください。
+      出力が**厳密に有効な JSON**であり、JSON 形式以外の追加テキストが含まれていないことを確認します。
+      空白は半角アンダーバー6個でお願いします。
+      example: [
+        {
+          "question": "______ people gathered at the park to watch the fireworks display.",
+          "answer": "Dozens of",
+          "a": "Be curious about ",
+          "b": "Think of ",
+          "c": "In fashion"
+        },
+        ...
+      ]
+      ${sharedFourChoiceCommand}
+    `;
   }
-
-
+  
   // デフォルト命令文（その他の科目や形式）
   return `
     ${baseCommand}

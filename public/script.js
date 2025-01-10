@@ -145,7 +145,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const formatOptions = {
     国語: ["現代文", "古文", "漢文"],
     数学: ["入力", "四択"],
-    英語: ["四択（文法）", "四択（語彙）", "長文"],
+    英語: ["四択（文法）", "四択（語彙）", "四択（熟語）", "長文"],
   };
 
   // 科目選択時のイベント
@@ -382,6 +382,9 @@ async function saveToGoogleSheets(result) {
     } else if (format === "四択（文法）") {
       spreadsheetId = "1StVPa6k7UC8dlOwFLuL6aERpBuRQv2SUMqCU2xFieDw";
       sheetName = encodeURIComponent("grammar");
+    } else if (format === "四択（熟語）") {
+      spreadsheetId = "1StVPa6k7UC8dlOwFLuL6aERpBuRQv2SUMqCU2xFieDw";
+      sheetName = encodeURIComponent("idiom");
     } else {
       throw new Error("Invalid format type");
     }
