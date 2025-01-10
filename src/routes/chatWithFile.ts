@@ -85,15 +85,21 @@ router.post(
         res.status(400).json({ success: false, message: "No valid files uploaded" });
         return;
       }
-      console.log(combinedText)
-      // 作問回数を計算
-      const maxQuestionsPerRequest = 10;
+      
+      // format に応じて maxQuestionsPerRequest を設定
+      let maxQuestionsPerRequest;
+      if (format === "四択（熟語）" || format === "四択（文法）") {
+          maxQuestionsPerRequest = 5;
+      } else {
+          maxQuestionsPerRequest = 10;
+      }
       const numRequests = Math.ceil(numQuestionsInt / maxQuestionsPerRequest); // 商＋1で計算
 
       // 分割された結果を保持する配列
       let allQuestions: { question: string; answer: string; a: string; b: string; c: string }[] = [];
 
       // テキストを等分に分割
+      
       const splitTexts = combinedText.split(/\s+/); // 空白で分割
       const chunkSize = Math.ceil(splitTexts.length / numRequests);
 
