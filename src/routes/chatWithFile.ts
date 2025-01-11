@@ -64,10 +64,38 @@ router.post(
             });
             fileContent = text.trim();
           } else if (fileMimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
-            const fileBuffer = await fs.readFile(file.path);
-            const { value } = await mammoth.extractRawText({ buffer: fileBuffer });
-            fileContent = value.trim();
-          } else if (fileMimeType === "application/pdf") {
+            try {
+              const fileBuffer = await fs.readFile(file.path);
+          
+              // Mammothの設定
+              const options = {
+                styleMap: ["p => p", "r => text"], // スタイルマップを設定
+              };
+          
+              // テキスト抽出
+              const { value } = await mammoth.extractRawText({ buffer: fileBuffer }); // オプションはこの段階では不要
+              console.log("Extracted raw text:", value);
+          
+              // スペースと改行の補正
+              const fixSpaces = (text: string) => {
+                return text
+                  .replace(/([a-zA-Z])([A-Z])/g, "$1 $2") // キャメルケースを分割
+                  .replace(/\s+/g, " ") // 複数スペースを1つに
+                  .trim(); // 前後の不要なスペースを削除
+              };
+          
+              fileContent = fixSpaces(value);
+            } catch (error) {
+              if (error instanceof Error) {
+                console.error("Error processing DOCX file:", error.message);
+              } else {
+                console.error("Unknown error occurred while processing DOCX file");
+              }
+              throw new Error("Failed to process DOCX file");
+            }
+          }
+          
+           else if (fileMimeType === "application/pdf") {
             const fileBuffer = await fs.readFile(file.path);
             const pdfData = await pdfParse(fileBuffer);
             fileContent = pdfData.text.trim();
