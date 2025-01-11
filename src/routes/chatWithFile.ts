@@ -175,7 +175,7 @@ function generateCommand(
     return `
       ${baseCommand}
       添付ファイル内の各英語の単語に対して、空欄補充語彙問題を 1 つ作成してください。
-      出力が **厳密に有効な JSON** であり、JSON 形式以外の追加テキストが含まれていないことを確認します
+      出力が厳密に有効な JSONであり、JSON 形式以外の追加テキストが含まれていないことを確認します
       example:[
         {
           "question": "The artist wants to _____ a masterpiece for the exhibition.",
@@ -193,7 +193,7 @@ function generateCommand(
       ${baseCommand}
       添付ファイルの文法規則と例を使用して、空欄補充の複数選択問題を作成します。
       空欄が、動詞の時制、主語と動詞の一致、接続詞の使用法など、特定の文法規則または構造を対象としていることを確認します。
-      出力が**厳密に有効な JSON**であり、JSON 形式以外の追加テキストが含まれていないことを確認します。
+      出力が厳密に有効なJSONであり、JSON 形式以外の追加テキストが含まれていないことを確認します。
       example: [
         {
           "question": "I wish we ______ the project earlier.",
@@ -209,19 +209,20 @@ function generateCommand(
   } else if (subject === "英語" && format === "四択（熟語）") {
     return `
       ${baseCommand}
-      資料内の各英熟語に対して空欄補充熟語問題を 1 つ作成してください。
-      出力が**厳密に有効な JSON**であり、JSON 形式以外の追加テキストが含まれていないことを確認します。
+      資料内の各英熟語に対して空欄補充熟語問題を 1 つ作成してください。熟語内の動詞は文脈に応じて変化させてください。
+      出力が厳密に有効なJSONであり、JSON 形式以外の追加テキストが含まれていないことを確認します。
       空白は半角アンダーバー6個でお願いします。
-      example: [
+      例: 英熟語が”keep doing”の場合の出力: [
         {
-          "question": "______ people gathered at the park to watch the fireworks display.",
-          "answer": "Dozens of",
-          "a": "Be curious about ",
-          "b": "Think of ",
-          "c": "In fashion"
+          "question": "If you want to improve, you must ______ practicing every day.",
+          "answer": "keep",
+          "a": "	think over",
+          "b": "get together",
+          "c": "take place"
         },
         ...
       ]
+        このように”doing”を”practicing”に当てはめて変化するべきです。
       ${sharedFourChoiceCommand}
     `;
   }
