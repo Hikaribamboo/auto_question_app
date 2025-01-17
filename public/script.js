@@ -386,12 +386,11 @@ async function saveToGoogleSheets(result) {
     } else if (format === "四択（熟語）") {
       spreadsheetId = "1StVPa6k7UC8dlOwFLuL6aERpBuRQv2SUMqCU2xFieDw";
       sheetName = encodeURIComponent("idiom");
-      range = `${sheetName}!B:B`; // B列全体を指定
     } else {
       throw new Error("Invalid format type");
     }
     
-    const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
+    const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
 
       method: "POST",
       headers: {

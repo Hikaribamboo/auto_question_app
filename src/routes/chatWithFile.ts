@@ -59,11 +59,13 @@ router.post(
           let fileContent = "";
 
           if (fileMimeType === "image/png") {
+            console.log("the file format is correct. it is a image/pdf")
             const { data: { text } } = await Tesseract.recognize(file.path, "jpn", {
               langPath: "./tessdata",
             });
             fileContent = text.trim();
           } else if (fileMimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+            console.log("the file format is correct")
             try {
               const fileBuffer = await fs.readFile(file.path);
           
@@ -81,7 +83,6 @@ router.post(
                 return text
                   .replace(/([a-zA-Z])([A-Z])/g, "$1 $2") // キャメルケースを分割
                   .replace(/\s+/g, " ") // 複数スペースを1つに
-                  .trim(); // 前後の不要なスペースを削除
               };
           
               fileContent = fixSpaces(value);
@@ -93,9 +94,8 @@ router.post(
               }
               throw new Error("Failed to process DOCX file");
             }
-          }
-          
-           else if (fileMimeType === "application/pdf") {
+          } else if (fileMimeType === "application/pdf") {
+            console.log("the file format is not correct")
             const fileBuffer = await fs.readFile(file.path);
             const pdfData = await pdfParse(fileBuffer);
             fileContent = pdfData.text.trim();
@@ -104,8 +104,6 @@ router.post(
             res.status(400).json({ success: false, message: "Unsupported file type" });
             return;
           }
-
-          console.log(`Extracted text from file: ${fileContent.substring(0, 100)}...`); // 最初の100文字を表示
           combinedText += fileContent + "\n"; // 結合
         }
       } else {
